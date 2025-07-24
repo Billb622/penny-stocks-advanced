@@ -14,7 +14,7 @@ st.title("🔥 Top Penny Stocks Dashboard")
 num_stocks = st.slider("How many stocks to display?", 5, 20, 10)
 
 # Finnhub API key (replace with your key)
-FINNHUB_API_KEY = d200o71r01qmbi8qhv00d200o71r01qmbi8qhv0g
+FINNHUB_API_KEY = "d200o71r01qmbi8qhv00d200o71r01qmbi8qhv0g"
 
 # Sample penny stock tickers list (you can expand this later)
 tickers = ["SNDL", "CEI", "NOK", "BBIG", "ZOM", "OCGN", "AHT", "GNUS", "HCMC", "AGRX"]
