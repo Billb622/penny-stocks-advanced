@@ -1,58 +1,69 @@
 import streamlit as st
-import yfinance as yf
-import pandas as pd
 import requests
-from streamlit_autorefresh import st_autorefresh
+import pandas as pd
 
-# Auto-refresh every 5 minutes
-st_autorefresh(interval=300000, key="datarefresh")
+# ✅ Finnhub API Key (replace with your key)
+FINNHUB_API_KEY = "your_finnhub_api_key"
 
-# App title
+# ✅ Penny stock list (example: you can expand this later)
+PENNY_STOCKS = ["NOK", "SNDL", "OCGN", "BBIG", "ZOM", "TRCH", "HCMC", "NAKD", "SENS", "IDEX"]
+
+# ✅ Streamlit UI
+st.set_page_config(page_title="🔥 Top Penny Stocks Dashboard", layout="wide")
 st.title("🔥 Top Penny Stocks Dashboard")
 
-# Input for number of stocks
-num_stocks = st.slider("How many stocks to display?", 5, 20, 10)
-
-# Finnhub API key (replace with your key)
-FINNHUB_API_KEY = "d200o71r01qmbi8qhv00d200o71r01qmbi8qhv0g"
-
-# Sample penny stock tickers list (you can expand this later)
-tickers = ["SNDL", "CEI", "NOK", "BBIG", "ZOM", "OCGN", "AHT", "GNUS", "HCMC", "AGRX"]
-
-# Fetch data
-data = []
-for ticker in tickers:
-    try:
-        stock = yf.Ticker(ticker)
-        price = stock.history(period="1d")["Close"][0]
-        if price < 5:  # Penny stock filter
-            # Get analyst rating from Finnhub
-            url = f"https://finnhub.io/api/v1/stock/recommendation?symbol={ticker}&token={FINNHUB_API_KEY}"
-            response = requests.get(url).json()
-            if response:
-                latest_rating = response[0]
-                strong_buy = latest_rating.get("strongBuy", 0)
-                buy = latest_rating.get("buy", 0)
-                sell = latest_rating.get("sell", 0)
-                score = strong_buy * 3 + buy * 2 - sell
-            else:
-                score = 0
-            data.append({
-                "Ticker": ticker,
-                "Price": round(price, 2),
-                "Volume": int(stock.info.get("volume", 0)),
-                "Analyst Score": score
-            })
-    except:
-        pass
-
-# Convert to DataFrame
-df = pd.DataFrame(data)
+# Slider for number of stocks to display
+count = st.slider("How many stocks to display?", 5, 20, 10)
 
 # Sort options
-sort_by = st.radio("Sort by:", ["Volume", "Analyst Score"])
-df = df.sort_values(by=sort_by, ascending=False)
+sort_option = st.radio("Sort by:", ["Strong Buy", "Volume"], index=0)
 
-# Display top stocks
-st.subheader(f"Top {num_stocks} Penny Stocks by {sort_by}")
-st.dataframe(df.head(num_stocks))
+# ✅ Function to get recommendations
+def get_recommendation(symbol):
+    url = f"https://finnhub.io/api/v1/stock/recommendation?symbol={symbol}&token={FINNHUB_API_KEY}"
+    response = requests.get(url).json()
+    if response:
+        latest = response[0]  # latest recommendation
+        return latest.get("strongBuy", 0), latest.get("buy", 0), latest.get("hold", 0), latest.get("sell", 0), latest.get("strongSell", 0)
+    return 0, 0, 0, 0, 0
+
+# ✅ Function to get quote data (price & volume)
+def get_quote(symbol):
+    url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+    response = requests.get(url).json()
+    return response.get("c", 0), response.get("v", 0)
+
+# ✅ Collect Data
+data = []
+for stock in PENNY_STOCKS:
+    strong_buy, buy, hold, sell, strong_sell = get_recommendation(stock)
+    price, volume = get_quote(stock)
+
+    # ✅ Only include stocks with at least 1 Strong Buy recommendation
+    if strong_buy > 0:
+        data.append({
+            "Ticker": stock,
+            "Price": price,
+            "Volume": volume,
+            "Strong Buy": strong_buy,
+            "Buy": buy,
+            "Hold": hold,
+            "Sell": sell,
+            "Strong Sell": strong_sell
+        })
+
+# ✅ Convert to DataFrame
+df = pd.DataFrame(data)
+
+# ✅ Sort
+if sort_option == "Strong Buy":
+    df = df.sort_values(by="Strong Buy", ascending=False)
+else:
+    df = df.sort_values(by="Volume", ascending=False)
+
+# ✅ Limit by slider
+df = df.head(count)
+
+# ✅ Display table
+st.subheader(f"Top {count} Penny Stocks (Strong Buy Priority)")
+st.dataframe(df)
