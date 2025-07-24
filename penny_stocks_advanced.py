@@ -1,11 +1,17 @@
+st_autorefresh(interval=300000, key="datarefresh")  # Refresh every 5 mins (300,000 ms)
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 import time
 
+from streamlit_autorefresh import st_autorefresh
+
+# Auto-refresh every 60 seconds
+st_autorefresh(interval=60000, key="penny_refresh")
+
 # Auto-refresh every 5 min (300 seconds)
-st_autorefresh = st.experimental_rerun
 
 st.set_page_config(page_title="Top Penny Stocks", layout="wide")
 st.title("🔥 Top 10 Penny Stocks Analyzer")
