@@ -1,81 +1,78 @@
-st_autorefresh(interval=300000, key="datarefresh")  # Refresh every 5 mins (300,000 ms)
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
-import time
-
 from streamlit_autorefresh import st_autorefresh
 
-# Auto-refresh every 60 seconds
-st_autorefresh(interval=60000, key="penny_refresh")
+# Auto-refresh every 5 minutes (300,000 ms)
+st_autorefresh(interval=300000, key="datarefresh")
 
-# Auto-refresh every 5 min (300 seconds)
+# -------------------------------
+# PAGE SETTINGS
+# -------------------------------
+st.set_page_config(page_title="Top 10 Penny Stocks", layout="wide")
+st.title("📈 Top 10 Penny Stocks (Under $5)")
 
-st.set_page_config(page_title="Top Penny Stocks", layout="wide")
-st.title("🔥 Top 10 Penny Stocks Analyzer")
-st.write("Filters: Price < $5, sorted by % gain. Click a ticker for chart!")
+# -------------------------------
+# STEP 1: Define Penny Stock Criteria
+# -------------------------------
+PRICE_LIMIT = 5.00  # Stocks below $5
+EXCHANGES = ["NASDAQ", "NYSE", "AMEX"]  # U.S. markets
 
-# Filters
-min_price = st.slider("Max Price", 0.1, 5.0, 5.0)
-min_volume = st.number_input("Minimum Volume", value=100000)
+# Example tickers (You can expand later or connect to an API)
+# These are liquid penny stocks as examples.
+TICKERS = ["SNDL", "AGRI", "CEI", "ZOM", "BBIG", "CLOV", "PROG", "IDEX", "HCMC", "VINO"]
 
-# Refresh button
-if st.button("🔄 Refresh Data"):
-    st.experimental_rerun()
+# -------------------------------
+# STEP 2: Fetch Data
+# -------------------------------
+def fetch_data(tickers):
+    data_list = []
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="1d")
+            info = stock.info
+            price = info.get("regularMarketPrice", None)
+            recs = info.get("recommendationKey", "N/A")  # Analyst recommendation
+            if price and price <= PRICE_LIMIT:
+                data_list.append({
+                    "Ticker": ticker,
+                    "Price": price,
+                    "Analyst Rating": recs.upper(),
+                    "Volume": info.get("volume", 0)
+                })
+        except Exception as e:
+            continue
+    return pd.DataFrame(data_list)
 
-# Hardcoded penny stock sample list (expand later)
-tickers = [
-    "SNDL", "ZOM", "HCMC", "AITX", "IQST", "ENZC", "NSAV", "GAXY", "VYST", "MJNA",
-    "XELA", "CTRM", "CEI", "METX", "NWBO", "RGBP", "COSM", "IDEX", "BTTX", "AGRI"
-]
+df = fetch_data(TICKERS)
 
-# Fetch stock data
-data = []
-for ticker in tickers:
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        price = info.get('regularMarketPrice', None)
-        volume = info.get('volume', 0)
-        change_percent = info.get('regularMarketChangePercent', 0)
-
-        if price and price < min_price and volume > min_volume:
-            data.append({
-                "Ticker": ticker,
-                "Price": round(price, 3),
-                "% Change": round(change_percent, 2),
-                "Volume": volume
-            })
-    except:
-        pass
-
-df = pd.DataFrame(data)
-
+# -------------------------------
+# STEP 3: Sort & Display
+# -------------------------------
 if not df.empty:
-    df = df.sort_values(by="% Change", ascending=False).head(10)
-    st.subheader("📊 Top 10 Penny Stocks:")
+    df = df.sort_values(by="Volume", ascending=False).head(10)
+    st.subheader("Top 10 Penny Stocks (Sorted by Volume)")
     st.dataframe(df)
 
-    # Select a ticker for chart
-    ticker_choice = st.selectbox("Select a ticker for chart:", df["Ticker"].tolist())
+    # -------------------------------
+    # STEP 4: Show Chart for First Stock
+    # -------------------------------
+    first_ticker = df.iloc[0]["Ticker"]
+    st.subheader(f"Price Chart: {first_ticker}")
+    chart_data = yf.download(first_ticker, period="5d", interval="1h")
 
-    if ticker_choice:
-        st.subheader(f"📈 {ticker_choice} - Last 1 Month Candlestick Chart")
-        hist = yf.download(ticker_choice, period="1mo", interval="1d")
-        fig = go.Figure(data=[go.Candlestick(
-            x=hist.index,
-            open=hist['Open'],
-            high=hist['High'],
-            low=hist['Low'],
-            close=hist['Close']
-        )])
-        fig.update_layout(xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
-
-    # CSV Download
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download CSV", csv, "top_penny_stocks.csv", "text/csv")
+    fig = go.Figure()
+    fig.add_trace(go.Candlestick(
+        x=chart_data.index,
+        open=chart_data['Open'],
+        high=chart_data['High'],
+        low=chart_data['Low'],
+        close=chart_data['Close'],
+        name='Candlestick'
+    ))
+    fig.update_layout(title=f"{first_ticker} (Last 5 Days)", xaxis_rangeslider_visible=False)
+    st.plotly_chart(fig, use_container_width=True)
 else:
-    st.warning("⚠ No penny stocks found with current filters.")
+    st.warning("No penny stocks found under $5 right now.")
